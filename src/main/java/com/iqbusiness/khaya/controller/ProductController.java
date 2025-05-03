@@ -38,4 +38,19 @@ public class ProductController {
 
         return ResponseEntity.ok(product);
     }
+
+    // Cached endpoint
+    @GetMapping("/{id}")
+    public ResponseEntity<Product> getProduct(@PathVariable Long id) {
+        long startTime = System.currentTimeMillis();
+
+        Product product = productService.getProductByIdWithCache(id);
+
+        if (product == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        return ResponseEntity.ok(product);
+    }
+
 }

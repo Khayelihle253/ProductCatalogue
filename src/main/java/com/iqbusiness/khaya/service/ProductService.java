@@ -5,6 +5,8 @@ import com.iqbusiness.khaya.repository.ProductRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +26,13 @@ public class ProductService {
     private final ProductRepository productRepository;
 
     private static final Random random = new Random();
+    private static final String CACHE_NAME = "products";
+
+    @Value("${app.database.simulate-latency:false}")
+    private boolean simulateLatency;
+
+    @Value("${app.database.latency-ms:500}")
+    private int latencyMs;
 
     @PostConstruct
     public void init() {
@@ -57,7 +66,7 @@ public class ProductService {
 
     @Transactional
     public List<Product> getAllProducts() {
-//        simulateDatabaseLatency();
+        simulateDatabaseLatency();
         return productRepository.findAll();
     }
 
@@ -65,13 +74,40 @@ public class ProductService {
     public Product getProductByIdNoCache(Long id) {
         long startTime = System.currentTimeMillis();
 
-//        simulateDatabaseLatency();
+        simulateDatabaseLatency();
         Optional<Product> product = productRepository.findById(id);
 
         long endTime = System.currentTimeMillis();
 //        cacheMetrics.recordNonCachedRequest(endTime - startTime);
 
         return product.orElse(null);
+    }
+
+    // Cached method - uses Redis cache provider
+    @Cacheable(value = CACHE_NAME, key = "#id")
+    public Product getProductByIdWithCache(Long id) {
+        long startTime = System.currentTimeMillis();
+
+        simulateDatabaseLatency();
+
+        Optional<Product> product = productRepository.findById(id);
+
+        long endTime = System.currentTimeMillis();
+//        cacheMetrics.recordCachedRequest(endTime - startTime);
+
+        return product.orElse(null);
+    }
+
+    private void simulateDatabaseLatency() {
+        if (simulateLatency) {
+            try {
+                // Add a small random factor to the latency
+                int actualLatency = latencyMs + random.nextInt(latencyMs / 2);
+                Thread.sleep(actualLatency);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
     }
 
 }
