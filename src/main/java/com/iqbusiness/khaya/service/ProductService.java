@@ -6,6 +6,8 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -96,6 +98,25 @@ public class ProductService {
 //        cacheMetrics.recordCachedRequest(endTime - startTime);
 
         return product.orElse(null);
+    }
+
+    @Transactional
+    @CachePut(value = CACHE_NAME, key = "#product.id")
+    public Product updateProduct(Product product) {
+        if (product.getId() == null) {
+            throw new IllegalArgumentException("Product ID cannot be null");
+        }
+
+        simulateDatabaseLatency();
+        product.setUpdatedAt(Timestamp.valueOf(LocalDateTime.now()));
+        return productRepository.save(product);
+    }
+
+    @Transactional
+    @CacheEvict(value = CACHE_NAME, key = "#id")
+    public void deleteProduct(Long id) {
+        simulateDatabaseLatency();
+        productRepository.deleteById(id);
     }
 
     private void simulateDatabaseLatency() {
